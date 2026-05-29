@@ -1,5 +1,8 @@
 import os
 import logging
+import threading
+from http.server import SimpleHTTPRequestHandler
+from socketserver import TCPServer
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 import yt_dlp
@@ -8,6 +11,14 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 logger = logging.getLogger(__name__)
 
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+
+# Render-এর ফ্রি ওয়েব সার্ভিসের জন্য একটি ফেক পোর্ট চালু করার ফাংশন
+def run_fake_server():
+    port = int(os.environ.get("PORT", 8080))
+    handler = SimpleHTTPRequestHandler
+    with TCPServer(("", port), handler) as httpd:
+        logger.info(f"Fake server running on port {port}")
+        httpd.serve_forever()
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(
@@ -55,6 +66,10 @@ def main():
     if not BOT_TOKEN:
         logger.error("TELEGRAM_BOT_TOKEN পাওয়া যায়নি!")
         return
+        
+    # ব্যাকগ্রাউন্ডে ফেক সার্ভারটি চালু করা যাতে Render ব্লক না করে
+    threading.Thread(target=run_fake_server, daemon=True).start()
+
     application = Application.builder().token(BOT_TOKEN).build()
     application.add_handler(CommandHandler("start", start))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, download_video))
